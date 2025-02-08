@@ -1,0 +1,104 @@
+// ===================================================================================
+// Project:   USB PD Adapter for CH32X035
+// Version:   v1.3
+// Year:      2024
+// Author:    Stefan Wagner
+// Github:    https://github.com/wagiminator
+// EasyEDA:   https://easyeda.com/wagiminator
+// License:   http://creativecommons.org/licenses/by-sa/3.0/
+// ===================================================================================
+//
+// Description:
+// ------------
+// With the USB PD Adapter you can use almost any PPS-capable USB Type-C PD power 
+// supply to power your projects with different selectable voltages and high currents.
+// Important values such as voltage, current, power and energy are displayed on the
+// OLED. The USB PD Adapter is based on the cheap and easy-to-use CH32X035 32-bit
+// RISC-V microcontroller with hardware USB PD support and the INA219 voltage and
+// current sensor IC.
+//
+// References:
+// -----------
+// - WCH Nanjing Qinheng Microelectronics: http://wch.cn
+//
+// Compilation Instructions:
+// -------------------------
+// - Make sure GCC toolchain (gcc-riscv64-unknown-elf, newlib) and Python3 with chprog
+//   are installed. In addition, Linux requires access rights to the USB bootloader.
+// - Press the BOOT button on the MCU board and keep it pressed while connecting it
+//   via USB to your PC.
+// - Run 'make flash'.
+//
+// Operating Instructions:
+// -----------------------
+// 1. Connect the USB PD Adapter to a USB Type-C PD power supply using a USB-C cable.
+// 2. Use the INC/DEC buttons to select the desired output voltage in steps of 20mV.
+// 3. Connect the device to the power consumer via the output screw terminal.
+// 4. Use the RST button to clear the energy counter.
+
+
+// ===================================================================================
+// Libraries, Definitions and Macros
+// ===================================================================================
+#include <config.h>                               // user configurations
+#include <system.h>                               // system functions
+#include <gpio.h>                                 // GPIO functions
+#include <millis.h>                               // millis functions
+#include <i2c_soft.h>                             // software I2C functions
+#include <oled.h>                                 // OLED functions
+#include <ina219.h>                               // INA219 functions
+#include <usbpd_sink.h>                           // USB PD sink functions
+#include <debug_serial.h>
+
+
+// ===================================================================================
+// Main Function
+// ===================================================================================
+int main(void) {
+  // Local variables
+//  uint16_t volt, curr;                            // voltage in mV, current in mA
+//  uint32_t power;                                 // power in mW
+//  uint32_t energy = 0, charge = 0;                // counter for energy and charge
+//  uint32_t interval, nowmillis, lastmillis = 0;   // for timing calculation in millis
+//  uint32_t duration = 0;                          // total duration in ms
+//  uint16_t seconds = 0;                           // total duration in seconds
+//  uint16_t minvolt = 5000;                        // minimum selectable voltage in mV
+//  uint16_t maxvolt = 5000;                        // maximum selectable voltage in mV
+  uint16_t setvolt = 5000;                        // selected volatge
+//  uint8_t keydelay;                               // key repeat delay
+//  uint8_t incdecpressed = 0;                      // INC/DEC key pressed flag
+//  uint8_t refreshcounter;                         // PD negotiation refresh counter
+//  uint8_t i;
+
+  // Setup DEBUG
+  DEBUG_init();
+  DEBUG_printf("\r\nadp_start\r\n");
+  PIN_output(PB12);
+  for(int i=0; i<2; i++){
+    PIN_high(PB12); DLY_ms(200);
+	PIN_low(PB12);  DLY_ms(200);
+  }
+
+  // Setup USB Power Delivery
+  OLED_clearScreen();                             // clear screen
+  if((!PD_connect()) || (!PD_getPPSNum())) {      // init USB PD, if failed:
+//    OLED_setCursor(36, 1);                        // set cursor
+//    OLED_printStr(OLED_PPS);                      // print "NO PPS"
+    while(1);
+  }
+
+  // Get max/min voltage of connected USB PD power supply
+//  for(i = PD_getFixedNum() + 1; i <= PD_getPDONum(); i++) {
+//    if(PD_getPDOMinVoltage(i) < minvolt) minvolt = PD_getPDOMinVoltage(i);
+//    if(PD_getPDOMaxVoltage(i) > maxvolt) maxvolt = PD_getPDOMaxVoltage(i);
+//  }
+
+  // Loop
+int lpct = 0;
+  while(1) {
+	int vv = 4+lpct; DEBUG_printf("%d ", vv);
+	setvolt = vv*1000; PD_setVoltage(setvolt);
+	DLY_ms(1000);
+	lpct++; if(lpct>16) {lpct = 0; DEBUG_printf("\r\n");}
+  }
+}

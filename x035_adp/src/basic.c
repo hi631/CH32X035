@@ -6,41 +6,37 @@
 
 // Compiler requires description
 #include <stdio.h>
+//#include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <debug.h>
-
-void monitor();
-uint8_t save_bas();
-uint8_t load_bas();
-void test_LED();
-void test_PDV();
+#include "debug_serial.h"
 
 // TOYOSHIKI TinyBASIC symbols
 // TO-DO Rewrite defined values to fit your machine as needed
 #define SIZE_LINE 78 //Command line buffer length + NULL
 #define SIZE_IBUF 78 //i-code conversion buffer size
-#define SIZE_LIST 8192-4 //List buffer size
+#define SIZE_LIST 1024 //List buffer size
 #define SIZE_ARRY 64 //Array area size
 #define SIZE_GSTK 6 //GOSUB stack size(2/nest)
 #define SIZE_LSTK 15 //FOR stack size(5/nest)
 
+uint8_t set_PPS();
+void set_LED();
+void DEBUG_write(char c);
+char DEBUG_read();
+
 // Depending on device functions
 // TO-DO Rewrite these functions to fit your machine
-
-//----------------------------------
-// basic_io
-//----------------------------------
-#define STR_EDITION "CH32X035"
-void c_putch(char ch){
+/*
+void m_putch(char ch){
     while(1){
       if(USART_GetFlagStatus(USART2, USART_FLAG_TXE) == ENABLE){
           USART_SendData(USART2, ch); break;
       }
     }
 }
-char c_getch(){
+char m_getch(){
     char ch = 0;
     while(1){
         if(USART_GetFlagStatus(USART2, USART_FLAG_RXNE) == ENABLE){
@@ -49,24 +45,24 @@ char c_getch(){
     }
     return ch;
 }
-
-char c_kbhit(){
-    return USART_GetFlagStatus(USART2, USART_FLAG_RXNE);
-}
-short rand(){
-    return 1; //
-}
-#define KEY_ENTER 13 // 10
-
-//----------------------------------
-// LINUX_io
-//----------------------------------
-/*
-#include <termios.h>
-#define STR_EDITION "LINUX"
+*/
+#define STR_EDITION "X035 fun"
+//---------------
 // Terminal control
-#define c_putch(c) putchar(c)
-
+#define c_putch(c) DEBUG_write(c)
+char c_getch(){
+	char ch;
+	ch = DEBUG_read();
+	return ch;
+}
+char c_kbhit(void){
+	return 0;
+}
+int rand(){
+	return 0;
+}
+//---------------
+/*
 char c_getch(){
 	struct termios b;
 	struct termios a;
@@ -103,6 +99,7 @@ char c_kbhit(void)
 }
 #define KEY_ENTER 10
 */
+#define KEY_ENTER 13
 void newline(void){
 	c_putch(KEY_ENTER); //LF
 }
@@ -121,7 +118,7 @@ const char* kwtbl[] = {
 	"FOR", "TO", "STEP", "NEXT",
 	"IF", "REM", "STOP",
 	"INPUT", "PRINT", "LET",
-	"SAVE", "LOAD", "MON", "?", "LED", "PD",        // Add
+	"?", "PPS", "LED",						// Add
 	",", ";",
 	"-", "+", "*", "/", "(", ")",
 	">=", "#", ">", "=", "<=", "<",
@@ -135,7 +132,7 @@ enum{
 	I_FOR, I_TO, I_STEP, I_NEXT,
 	I_IF, I_REM, I_STOP,
 	I_INPUT, I_PRINT, I_LET,
-	I_SAVE, I_LOAD, I_MON, I_PRINT2, I_LED, I_PD,   // Add
+	I_PRINT2, I_PPS, I_LED,				// Add
 	I_COMMA, I_SEMI,
 	I_MINUS, I_PLUS, I_MUL, I_DIV, I_OPEN, I_CLOSE,
 	I_GTE, I_SHARP, I_GT, I_EQ, I_LTE, I_LT,
@@ -202,8 +199,7 @@ const char* errmsg[] ={
 	"Syntax error",
 	"Internal error",
 	"Abort by [ESC]",
-	"Flash Error",      // 23
-	"Error"             // 24
+	"PPS Error",		// 23
 };
 
 // Error code assignment
@@ -222,8 +218,7 @@ enum{
 	ERR_COM,
 	ERR_SYNTAX,
 	ERR_SYS,
-	ERR_ESC,
-	ERR_FLASH
+	ERR_ESC
 };
 
 // RAM mapping
@@ -507,12 +502,6 @@ short getsize() {
 	for (lp = listbuf; *lp; lp += *lp);
 	return listbuf + SIZE_LIST - lp - 1;
 }
-uint32_t getlast() {
-    unsigned char* lp;
-
-    for (lp = listbuf; *lp; lp += *lp);
-    return (int)lp;
-}
 
 // Insert i-code to the list
 // Preconditions to do *ibuf = len
@@ -531,7 +520,8 @@ void inslist() {
 	if (getlineno(insp) == getlineno(ibuf)) {// line number agree
 		p1 = insp;
 		p2 = p1 + *p1;
-		while (len = *p2) {
+		//while (len = *p2) {
+		while ((len = *p2)==0) {
 			while (len--)
 				*p1++ = *p2++;
 		}
@@ -651,7 +641,6 @@ short getparam(){
 short ivalue() {
 	short value;
 
-	value = 0;
 	switch (*cip) {
 	case I_NUM:
 		cip++;
@@ -1173,36 +1162,19 @@ unsigned char* iexe() {
 			cip++;
 			ilet();
 			break;
-        case I_SAVE:
-            cip++;
-            lineno = iexp(); // set Flash Page
-            //putnum(lineno, 10); putnum((int)listbuf, 10); putnum(getlast(), 10);
-            err = save_bas(lineno, (uint32_t)listbuf, (uint32_t)getlast());
-            if (err) break;
-            break;
-        case I_LOAD:
-            cip++;
-            lineno = iexp(); // get Flash Page
-            err = load_bas(lineno, (uint32_t)listbuf);
-            if (err) break;
-            break;
-        case I_MON:
-            cip++;
-            monitor();
-            if (err) break;
-            break;
-        case I_LED:
+		case I_PPS:
             cip++;
             lineno = iexp();
-            test_LED(lineno);
+            err = set_PPS(lineno);
+			if (err) break;
             break;
-        case I_PD:
+		case I_LED:
             cip++;
             lineno = iexp();
-            test_PDV(lineno);
+            set_LED(lineno);
             break;
-        case I_PRINT2:  // ?
- 		case I_PRINT:   // PRINT
+		case I_PRINT2:
+		case I_PRINT:
 			cip++;
 			iprint();
 			break;
@@ -1254,11 +1226,7 @@ void ilist() {
 	short lineno;
 
 	lineno = (*cip == I_NUM) ? getlineno(cip) : 0;
-
-	for (clp = listbuf;
-	*clp && (getlineno(clp) < lineno);
-		clp += *clp);
-
+	for (clp = listbuf;	*clp && (getlineno(clp) < lineno);	) clp += *clp;
 		while (*clp) {
 			putnum(getlineno(clp), 0);
 			c_putch(' ');
@@ -1348,6 +1316,7 @@ void basic(){
 	c_puts("TOYOSHIKI TINY BASIC"); newline();
 	c_puts(STR_EDITION);
 	c_puts(" EDITION"); newline();
+	//while(0){ char ch =c_getch(); c_putch(ch);}
 	error(); // Print OK, and Clear error flag
 
 	// Input 1 line and execute

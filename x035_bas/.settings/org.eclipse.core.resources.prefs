@@ -10,6 +10,7 @@ encoding//Startup/startup_ch32x035.S=GBK
 encoding//User/basic.c=GBK
 encoding//User/ch32x035_conf.h=GBK
 encoding//User/ch32x035_it.c=GBK
+encoding//User/flash_io.c=GBK
 encoding//User/main.c=GBK
 encoding//User/monitor.c=GBK
 encoding//User/usbpd_sink.c=GBK
