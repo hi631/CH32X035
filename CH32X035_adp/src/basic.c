@@ -46,7 +46,7 @@ char m_getch(){
     return ch;
 }
 */
-#define STR_EDITION "X035 fun"
+#define STR_EDITION "x035"
 //---------------
 // Terminal control
 #define c_putch(c) DEBUG_write(c)
