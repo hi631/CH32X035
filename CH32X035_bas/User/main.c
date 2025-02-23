@@ -51,39 +51,6 @@ int main(void)
     USART_Printf_Init(115200);
     usbpd_sink_init();
 
-    basic();
+    while(1) basic();
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
