@@ -1353,7 +1353,6 @@ void basic(){
 	error(); // Print OK, and Clear error flag
 
 	uint8_t autof = auto_bas();
-	autof = 1;
 	// Input 1 line and execute
 	while(1){
 	    if(autof==1){
