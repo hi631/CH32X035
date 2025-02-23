@@ -521,7 +521,7 @@ void inslist() {
 		p1 = insp;
 		p2 = p1 + *p1;
 		//while (len = *p2) {
-		while ((len = *p2)==0) {
+		while ((len = *p2)>0) {
 			while (len--)
 				*p1++ = *p2++;
 		}
